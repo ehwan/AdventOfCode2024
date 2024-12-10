@@ -1,111 +1,63 @@
 use std::fs::read;
 
-struct Pos<'a> {
-    i: usize,
-    block_i: usize,
-    block_local_i: usize,
-    input: &'a [u8],
-}
-impl<'a> Pos<'a> {
-    fn new(input: &'a [u8]) -> Self {
-        Self {
-            i: 0,
-            block_i: 0,
-            block_local_i: 0,
-            input,
-        }
-    }
-    fn new_tail(input: &'a [u8]) -> Self {
-        let mut i = 0;
-        for &n in input.iter() {
-            i += n as usize;
-        }
-        i -= 1;
-        println!("last: {}", input.last().unwrap());
-        let mut ret = Self {
-            i,
-            block_i: input.len() - 1,
-            block_local_i: *input.last().unwrap() as usize - 1,
-            input,
-        };
-        while !ret.is_file() {
-            ret.to_prev();
-        }
-        ret
-    }
+use std::collections::LinkedList;
 
-    fn is_file(&self) -> bool {
-        self.block_i % 2 == 0
-    }
-    fn position(&self) -> usize {
-        self.i
-    }
-    fn file_id(&self) -> Option<usize> {
-        if self.is_file() {
-            Some(self.block_i / 2)
-        } else {
-            None
-        }
-    }
-
-    fn to_next(&mut self) {
-        if self.block_local_i == self.input[self.block_i] as usize - 1 {
-            self.block_i += 1;
-            while self.input[self.block_i] == 0 {
-                self.block_i += 1;
-            }
-            self.block_local_i = 0;
-        } else {
-            self.block_local_i += 1;
-        }
-        self.i += 1;
-    }
-    fn to_prev(&mut self) {
-        if self.block_local_i == 0 {
-            self.block_i -= 1;
-            while self.input[self.block_i] == 0 {
-                self.block_i -= 1;
-            }
-            self.block_local_i = self.input[self.block_i] as usize - 1;
-        } else {
-            self.block_local_i -= 1;
-        }
-        self.i -= 1;
-    }
-}
+enum Block {}
 
 fn main() {
-    let mut input = read("input.txt").unwrap();
+    let mut input = read("input1.txt").unwrap();
+    let mut list = LinkedList::new();
     for x in input.iter_mut() {
-        if !(b'0'..=b'9').contains(x) {
-            break;
-        }
         *x -= b'0';
     }
-    let l = input.len();
+    let mut moved = Vec::new();
+    moved.resize(input.len(), false);
 
-    let mut first = Pos::new(&input[..l - 1]);
-    let mut last = Pos::new_tail(&input[..l - 1]);
-
+    let mut i = 0;
     let mut answer = 0;
-    while first.i <= last.i {
-        if first.is_file() {
-            let i = first.i as u64;
-            let id = first.file_id().unwrap() as u64;
-            answer += i * id;
-            first.to_next();
-        } else {
-            let i = first.i as u64;
-            let id = last.file_id().unwrap() as u64;
-            answer += i * id;
 
-            first.to_next();
-            last.to_prev();
-            while !last.is_file() {
-                last.to_prev();
+    let mut right_block = input.len() - 1;
+    if right_block % 2 != 0 {
+        right_block -= 1;
+    }
+
+    for left_block in 0..input.len() {
+        if left_block % 2 == 0 {
+            // file block
+            let id = left_block / 2;
+            let l = input[left_block];
+            if moved[left_block] {
+                i += l as u64;
+            } else {
+                for _ in 0..l {
+                    answer += id as u64 * i;
+                    i += 1;
+                }
+            }
+        } else {
+            // empty block
+            let l = input[left_block];
+            while right_block > left_block && input[right_block] > l {
+                right_block -= 2;
+            }
+            if right_block > left_block {
+                let id = right_block / 2;
+                println!("id: {}, i: {}, l: {}", id, i, l);
+                let i_next = i + l as u64;
+                let l = input[right_block];
+                println!("l: {}", l);
+                for _ in 0..l {
+                    answer += id as u64 * i;
+                    i += 1;
+                }
+                i = i_next;
+                moved[right_block] = true;
+                right_block -= 2;
+            } else {
+                i = i + l as u64;
             }
         }
     }
-    println!("");
-    println!("{}", answer);
+
+    println!("Answer: {}", answer);
 }
